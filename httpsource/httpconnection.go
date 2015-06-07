@@ -15,8 +15,10 @@ import (
 
 // Matches pairs of requests & responses
 type RequestResponsePair struct {
-	Request  *http.Request
-	Response *http.Response
+	Request      *http.Request
+	RequestBody  []byte
+	Response     *http.Response
+	ResponseBody []byte
 }
 
 // HTTPConnection represents the HTTP transactions within a single
@@ -101,9 +103,9 @@ func (conn *HTTPConnection) readConnection(request, response *bufio.Reader) {
 			return
 		}
 		// Replace the body
-		buf, err := ioutil.ReadAll(req.Body)
+		reqbuf, err := ioutil.ReadAll(req.Body)
 		req.Body.Close()
-		req.Body = &bodyBuffer{bytes.NewReader(buf)}
+		req.Body = &bodyBuffer{bytes.NewReader(reqbuf)}
 		if handleErr(err) {
 			return
 		}
@@ -118,14 +120,15 @@ func (conn *HTTPConnection) readConnection(request, response *bufio.Reader) {
 
 		// Replace the body
 		// TODO: figure out a lower memory version of this
-		buf, err = ioutil.ReadAll(resp.Body)
+		respbuf, err := ioutil.ReadAll(resp.Body)
 		if handleErr(err) {
 			return
 		}
 		resp.Body.Close()
-		resp.Body = &bodyBuffer{bytes.NewReader(buf)}
+		resp.Body = &bodyBuffer{bytes.NewReader(respbuf)}
 
-		pair := &RequestResponsePair{Request: req, Response: resp}
+		pair := &RequestResponsePair{Request: req,
+			RequestBody: reqbuf, Response: resp, ResponseBody: respbuf}
 		conn.Pairs = append(conn.Pairs, pair)
 
 		err = consumeWhitespace(response)

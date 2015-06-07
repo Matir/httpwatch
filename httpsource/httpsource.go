@@ -22,6 +22,7 @@ type connKey [2]gopacket.Flow
 // Implements tcpassembly.StreamFactory
 type HTTPSource struct {
 	Connections chan *HTTPConnection
+	Pairs       chan *RequestResponsePair
 	pending     map[connKey]*HTTPConnection
 	pool        *tcpassembly.StreamPool
 	readers     int
@@ -76,6 +77,22 @@ func (src *HTTPSource) connectionFinished(conn *HTTPConnection) {
 	default:
 		return
 	}
+}
+
+// Provide Request/Response pairs instead of full connections
+func (src *HTTPSource) ConvertConnectionsToPairs() {
+	if src.Pairs != nil {
+		panic("ConvertConnectionsToPairs called multiple times!")
+	}
+	src.Pairs = make(chan *RequestResponsePair, cap(src.Connections))
+	go func() {
+		for conn := range src.Connections {
+			for _, pair := range conn.Pairs {
+				src.Pairs <- pair
+			}
+		}
+		close(src.Pairs)
+	}()
 }
 
 // Add a new packet source
