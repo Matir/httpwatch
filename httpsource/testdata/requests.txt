@@ -1,0 +1,10 @@
+GET / HTTP/1.1
+Host: systemoverlord.com
+User-Agent: Demo
+Cookie: a=b;c=%0a%0d
+
+GET /favicon.ico HTTP/1.1
+Host: systemoverlord.com
+User-Agent: Demo2
+Cookie: a=b,c=%20
+
