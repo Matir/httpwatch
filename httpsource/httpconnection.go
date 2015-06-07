@@ -23,9 +23,12 @@ type RequestResponsePair struct {
 // TCP session.  It may contain 1 or more RequestResponsePairs.
 // Multiple pairs will be included in a keep-alive connection.
 type HTTPConnection struct {
-	Pairs    []*RequestResponsePair
-	key      connKey
-	a, b     *tcpreader.ReaderStream
+	Pairs []*RequestResponsePair
+	key   connKey
+	data  [2][]byte
+	cdata int
+	fin   chan bool
+	//a, b     *tcpreader.ReaderStream
 	Finished func(*HTTPConnection)
 	err      error
 }
@@ -35,22 +38,37 @@ type bodyBuffer struct {
 	*bytes.Reader
 }
 
+// Create an HTTPConnection
+func NewHTTPConnection(key connKey, finished func(*HTTPConnection)) *HTTPConnection {
+	c := &HTTPConnection{Finished: finished, key: key}
+	c.fin = make(chan bool, 2)
+	return c
+}
+
 // Add a ReaderStream to this connection.
 func (conn *HTTPConnection) AddStream(s *tcpreader.ReaderStream) {
-	if conn.a == nil {
-		conn.a = s
-		return
-	}
-	if conn.b == nil {
-		conn.b = s
+	// launch a goroutine to read everything
+	choice := conn.cdata
+	conn.cdata++
+	go func() {
+		data, err := ioutil.ReadAll(s)
+		conn.data[choice] = data
+		if err != nil {
+			logger.Printf("Unable to read all from connection: %v\n", err)
+			conn.err = err
+		}
+		conn.fin <- true
+	}()
+	if conn.cdata == 2 {
 		go conn.startReadConnection()
-		return
 	}
-	panic("More than 2 Streams for one connection!")
 }
 
 // Read the connection data into Request/Response Pairs
 func (conn *HTTPConnection) startReadConnection() {
+	// Wait for 2 to be finished
+	<-conn.fin
+	<-conn.fin
 	request, response, err := conn.sortStreams()
 	if err != nil {
 		logger.Printf("Error getting request/response: %v\n", err)
@@ -125,7 +143,8 @@ func (conn *HTTPConnection) Success() bool {
 
 // Who is the request & response?
 func (conn *HTTPConnection) sortStreams() (*bufio.Reader, *bufio.Reader, error) {
-	a, b := bufio.NewReader(conn.a), bufio.NewReader(conn.b)
+	a := bufio.NewReader(bytes.NewReader(conn.data[0]))
+	b := bufio.NewReader(bytes.NewReader(conn.data[1]))
 	peek, err := a.Peek(5)
 	if err != nil {
 		return nil, nil, err
@@ -139,8 +158,6 @@ func (conn *HTTPConnection) sortStreams() (*bufio.Reader, *bufio.Reader, error) 
 
 // Execute the finished callback
 func (conn *HTTPConnection) execCallback() {
-	conn.a = nil
-	conn.b = nil
 	conn.Finished(conn)
 }
 
