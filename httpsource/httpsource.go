@@ -31,6 +31,7 @@ type HTTPSource struct {
 
 var logger = log.New(os.Stderr, "httpsource: ", log.Lshortfile|log.Ltime)
 
+// Create a new empty source
 func NewHTTPSource() *HTTPSource {
 	src := &HTTPSource{}
 	src.pending = make(map[connKey]*HTTPConnection)
@@ -66,6 +67,7 @@ func (src *HTTPSource) connectionFinished(conn *HTTPConnection) {
 	delete(src.pending, conn.key)
 	src.mu.Unlock()
 	if conn.Success() {
+		logger.Printf("Success.\n")
 		src.Connections <- conn
 	}
 	select {
@@ -154,10 +156,16 @@ func (src *HTTPSource) readerFinished() {
 func (src *HTTPSource) Finished() bool {
 	src.mu.Lock()
 	defer src.mu.Unlock()
-	return src.readers == 0
+	if src.readers == 0 && len(src.pending) == 0 {
+		close(src.Connections)
+		return true
+	}
+	return false
 }
 
-// Wait until all readers are finished
+// Wait until all readers are finished and their streams
+// have been processed.  Note that this may block if
+// enough connections exist to fill src.Connections.
 func (src *HTTPSource) WaitUntilFinished() {
 	for {
 		if func() bool { // Block to scope the defer
@@ -165,9 +173,9 @@ func (src *HTTPSource) WaitUntilFinished() {
 			src.mu.Lock()
 			defer src.mu.Unlock()
 			if src.readers == 0 && len(src.pending) == 0 {
+				close(src.Connections)
 				return true
 			}
-			logger.Printf("R: %d P: %d\n", src.readers, len(src.pending))
 			return false
 		}() {
 			break
