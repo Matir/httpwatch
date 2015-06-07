@@ -13,7 +13,9 @@ import (
 	"net/http"
 )
 
-// Matches pairs of requests & responses
+// RequestResponsePair is a container for an associated
+// http.Request and http.Response, along with a copy of their bodies,
+// to allow repeated inspection.
 type RequestResponsePair struct {
 	Request      *http.Request
 	RequestBody  []byte
@@ -25,29 +27,28 @@ type RequestResponsePair struct {
 // TCP session.  It may contain 1 or more RequestResponsePairs.
 // Multiple pairs will be included in a keep-alive connection.
 type HTTPConnection struct {
-	Pairs []*RequestResponsePair
-	key   connKey
-	data  [2][]byte
-	cdata int
-	fin   chan bool
-	//a, b     *tcpreader.ReaderStream
+	Pairs    []*RequestResponsePair
+	key      connKey
+	data     [2][]byte
+	cdata    int
+	fin      chan bool
 	Finished func(*HTTPConnection)
 	err      error
 }
 
-// Emulate a ReaderCloser
+// bodyBuffer implements ReaderCloser by wrapping a bytes.Reader.
 type bodyBuffer struct {
 	*bytes.Reader
 }
 
-// Create an HTTPConnection
+// NewHTTPConnection reates an HTTPConnection for a given key with a callback.
 func NewHTTPConnection(key connKey, finished func(*HTTPConnection)) *HTTPConnection {
 	c := &HTTPConnection{Finished: finished, key: key}
 	c.fin = make(chan bool, 2)
 	return c
 }
 
-// Add a ReaderStream to this connection.
+// AddStream adds a ReaderStream to the connection conn.
 func (conn *HTTPConnection) AddStream(s *tcpreader.ReaderStream) {
 	// launch a goroutine to read everything
 	choice := conn.cdata
@@ -140,6 +141,7 @@ func (conn *HTTPConnection) readConnection(request, response *bufio.Reader) {
 	}
 }
 
+// Success returns true if any connection data was read, false otherwise.
 func (conn *HTTPConnection) Success() bool {
 	return len(conn.Pairs) > 0
 }

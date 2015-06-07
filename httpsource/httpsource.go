@@ -19,7 +19,8 @@ import (
 
 type connKey [2]gopacket.Flow
 
-// Implements tcpassembly.StreamFactory
+// HTTPSource implements tcpassembly.StreamFactory and manages reading
+// HTTP data from previous connections.
 type HTTPSource struct {
 	Connections chan *HTTPConnection
 	Pairs       chan *RequestResponsePair
@@ -32,7 +33,7 @@ type HTTPSource struct {
 
 var logger = log.New(os.Stderr, "httpsource: ", log.Lshortfile|log.Ltime)
 
-// Create a new empty source
+// NewHTTPSource creates a new empty source with initialized maps and channels.
 func NewHTTPSource() *HTTPSource {
 	src := &HTTPSource{}
 	src.pending = make(map[connKey]*HTTPConnection)
@@ -42,7 +43,7 @@ func NewHTTPSource() *HTTPSource {
 	return src
 }
 
-// Create a new stream for a given flow
+// New creates a new stream for a given flow
 func (src *HTTPSource) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
 	stream := tcpreader.NewReaderStream()
 	// Add to mappings
@@ -68,7 +69,6 @@ func (src *HTTPSource) connectionFinished(conn *HTTPConnection) {
 	delete(src.pending, conn.key)
 	src.mu.Unlock()
 	if conn.Success() {
-		logger.Printf("Success.\n")
 		src.Connections <- conn
 	}
 	select {
@@ -79,7 +79,8 @@ func (src *HTTPSource) connectionFinished(conn *HTTPConnection) {
 	}
 }
 
-// Provide Request/Response pairs instead of full connections
+// ConvertConnectionsToPairs request that the HTTPSource
+// provide Request/Response pairs instead of full connections
 func (src *HTTPSource) ConvertConnectionsToPairs() {
 	if src.Pairs != nil {
 		panic("ConvertConnectionsToPairs called multiple times!")
@@ -95,7 +96,7 @@ func (src *HTTPSource) ConvertConnectionsToPairs() {
 	}()
 }
 
-// Add a new packet source
+// AddSource addd a new packet source to the HTTPSource
 func (src *HTTPSource) AddSource(pktsrc *gopacket.PacketSource) {
 	assembler := tcpassembly.NewAssembler(src.pool)
 	// Increment the counter
@@ -106,24 +107,26 @@ func (src *HTTPSource) AddSource(pktsrc *gopacket.PacketSource) {
 	go src.readPacketsFromSource(pktsrc, assembler)
 }
 
-// Helper for pcap files
+// AddPCAPFile reads in a pcap file as a PacketSource.
 func (src *HTTPSource) AddPCAPFile(fname string) error {
-	if handle, err := pcap.OpenOffline(fname); err != nil {
+	var handle *pcap.Handle
+	var err error
+	if handle, err = pcap.OpenOffline(fname); err != nil {
 		return err
-	} else {
-		return src.addPCAPSource(handle)
 	}
+	return src.addPCAPSource(handle)
 }
 
-// Helper for live cap.
+// AddPCAPIface is a helper for live capture.
 // Assumes a lot of things.  If you want more control, build your own source
 // and call AddSource
 func (src *HTTPSource) AddPCAPIface(iface string) error {
-	if handle, err := pcap.OpenLive(iface, 0xffff, false, 100*time.Millisecond); err != nil {
+	var handle *pcap.Handle
+	var err error
+	if handle, err = pcap.OpenLive(iface, 0xffff, false, 100*time.Millisecond); err != nil {
 		return err
-	} else {
-		return src.addPCAPSource(handle)
 	}
+	return src.addPCAPSource(handle)
 }
 
 // Common pcap code
@@ -169,7 +172,7 @@ func (src *HTTPSource) readerFinished() {
 	}
 }
 
-// Check if all readers have finished
+// Finished returns true if all readers and assemblers have finished.
 func (src *HTTPSource) Finished() bool {
 	src.mu.Lock()
 	defer src.mu.Unlock()
@@ -180,22 +183,15 @@ func (src *HTTPSource) Finished() bool {
 	return false
 }
 
-// Wait until all readers are finished and their streams
-// have been processed.  Note that this may block if
-// enough connections exist to fill src.Connections.
+// WaitUntilFinished waits until all readers are
+// finished and their streams have been processed.
+// Note that this may block if enough connections
+// exist to fill src.Connections.
 func (src *HTTPSource) WaitUntilFinished() {
 	for {
-		if func() bool { // Block to scope the defer
-			<-src.finished
-			src.mu.Lock()
-			defer src.mu.Unlock()
-			if src.readers == 0 && len(src.pending) == 0 {
-				close(src.Connections)
-				return true
-			}
-			return false
-		}() {
-			break
+		<-src.finished
+		if src.Finished() {
+			return
 		}
 	}
 }
