@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Matir/httpwatch/httpsource"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strings"
 )
@@ -20,11 +21,12 @@ func buildGetter(value string) (FieldGetter, error) {
 	if err != nil {
 		return nil, err
 	}
+	rr = strings.ToLower(rr)
 	if rr != "request" && rr != "response" {
 		return nil, fmt.Errorf("Unknown entity: %s", rr)
 	}
 	if strings.ContainsRune(remains, '.') {
-		field, attribute, _ := splitFirst(value, ".")
+		field, attribute, _ := splitFirst(remains, ".")
 		return buildTwoPartGetter(rr, field, attribute)
 	}
 	return buildOnePartGetter(rr, remains)
@@ -33,7 +35,14 @@ func buildGetter(value string) (FieldGetter, error) {
 func buildTwoPartGetter(rr, field, attribute string) (FieldGetter, error) {
 	switch field {
 	case "header":
-		return buildHeaderValueGetter(rr, attribute), nil
+		return buildHeaderValueGetter(rr, attribute)
+	}
+	switch rr {
+	case "request":
+		switch field {
+		case "url":
+			return buildURLFieldGetter(attribute)
+		}
 	}
 	return nil, fmt.Errorf("Unknown field: %s", field)
 }
@@ -73,18 +82,20 @@ func responseHeaderGetter(pair *httpsource.RequestResponsePair) http.Header {
 	return pair.Response.Header
 }
 
-func buildHeaderValueGetter(rr, name string) FieldGetter {
+func buildHeaderValueGetter(rr, name string) (FieldGetter, error) {
 	getter := requestHeaderGetter
 	if rr == "response" {
 		getter = responseHeaderGetter
 	}
+	// Canonicalize header name
+	name = textproto.CanonicalMIMEHeaderKey(name)
 	return func(pair *httpsource.RequestResponsePair) (string, error) {
 		h := getter(pair)
 		if val, ok := h[name]; ok {
 			return strings.Join(val, ";"), nil
 		}
 		return "", nil
-	}
+	}, nil
 }
 
 // Build URL matching code

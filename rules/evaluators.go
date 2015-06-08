@@ -25,8 +25,8 @@ func BuildEvaluator(r *Rule) (Evaluator, error) {
 		return &OrEvaluator{rule: r}, nil
 	}
 
-	// These do require a value
-	getter, err := buildGetter(r.Value)
+	// These do require a value from the request/response
+	getter, err := buildGetter(r.Field)
 	if err != nil {
 		return nil, err
 	}
@@ -41,9 +41,8 @@ func BuildEvaluator(r *Rule) (Evaluator, error) {
 			return nil, err
 		}
 		return &RegexEvaluator{r, &getter, re}, nil
-	default:
-		return nil, fmt.Errorf("Invalid operator: %s", r.Operator)
 	}
+	return nil, fmt.Errorf("Invalid operator: %s", r.Operator)
 }
 
 // Possible operations
