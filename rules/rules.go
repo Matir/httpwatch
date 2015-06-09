@@ -2,6 +2,8 @@ package rules
 
 import (
 	"github.com/Matir/httpwatch/httpsource"
+	"log"
+	"os"
 )
 
 type Rule struct {
@@ -12,6 +14,8 @@ type Rule struct {
 	Value     string
 	evaluator Evaluator
 }
+
+var logger = log.New(os.Stderr, "rules: ", log.Lshortfile|log.Ltime)
 
 func (r *Rule) Eval(pair *httpsource.RequestResponsePair) bool {
 	if r.evaluator == nil {

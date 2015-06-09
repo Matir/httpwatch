@@ -43,7 +43,10 @@ func main() {
 
 	// Start all the working parts
 	ruleEngine.Start()
+	outputEngine.Start()
 
 	// Wait until finished
 	source.WaitUntilFinished()
+	ruleEngine.WaitUntilFinished()
+	outputEngine.WaitUntilFinished()
 }

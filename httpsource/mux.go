@@ -13,6 +13,7 @@ type output struct {
 // PairMux reads from a single channel and distributes it to
 // many child channels in parallel.
 type PairMux struct {
+	Finished chan bool
 	outputs  []output
 	lock     sync.Mutex
 	src      <-chan *RequestResponsePair
@@ -25,13 +26,13 @@ type PairMux struct {
 // NewBlockingPairMux creates a new PairMux that blocks on writes to full
 // channels.
 func NewBlockingPairMux(src <-chan *RequestResponsePair) PairMux {
-	m := PairMux{src: src, blocking: true, writer: blockingOutputWriter}
+	m := PairMux{src: src, blocking: true, writer: blockingOutputWriter, Finished: make(chan bool, 1)}
 	return m
 }
 
 // NewNonBlockingPairMux creates new PairMux that doesn't block on writes.
 func NewNonBlockingPairMux(src <-chan *RequestResponsePair, timeout time.Duration) PairMux {
-	m := PairMux{src: src, blocking: false, timeout: timeout}
+	m := PairMux{src: src, blocking: false, timeout: timeout, Finished: make(chan bool, 1)}
 	if timeout != 0 {
 		m.writer = makeTimeoutOutputWriter(timeout)
 	} else {
@@ -68,11 +69,13 @@ func (m *PairMux) Start() {
 }
 
 func (m *PairMux) shutdown() {
+	logger.Printf("PairMux shutting down, %d channels...\n", len(m.outputs))
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	for _, output := range m.outputs {
 		close(output.dst)
 	}
+	m.Finished <- true
 }
 
 // RunStep handles a single item through the mux
@@ -89,6 +92,11 @@ func (m *PairMux) RunStep() bool {
 		m.writer(output, item)
 	}
 	return true
+}
+
+// WaitUntilFinished waits until finished
+func (m *PairMux) WaitUntilFinished() {
+	<-m.Finished
 }
 
 // blockingOutputWriter writes out to a channel
