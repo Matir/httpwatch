@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"github.com/Matir/httpwatch/rules"
 	"io/ioutil"
@@ -28,8 +29,8 @@ type Config struct {
 }
 
 type outputConfig struct {
-	name    string
-	options map[string]string
+	Name    string
+	Options map[string]string
 }
 
 func (c *Config) ParseConfigFile(name string) {
@@ -62,8 +63,14 @@ func (c *Config) Init() {
 	}
 }
 
-func (c *Config) Valid() bool {
-	return false
+func (c *Config) Valid() error {
+	if len(c.PcapFiles)+len(c.Interfaces) == 0 {
+		return errors.New("Need a pcap or interface!")
+	}
+	if len(c.Outputs) == 0 {
+		return errors.New("Need an output!")
+	}
+	return nil
 }
 
 func (rs *RepeatedStringFlag) String() string {
