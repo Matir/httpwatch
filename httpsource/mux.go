@@ -58,22 +58,37 @@ func (m *PairMux) Start() {
 	}
 	go func() {
 		for {
-			m.RunStep()
+			if !m.RunStep() {
+				m.shutdown()
+				return
+			}
 		}
 	}()
 	m.started = true
 }
 
-// RunStep handles a single item through the mux
-func (m *PairMux) RunStep() {
-	item := <-m.src
+func (m *PairMux) shutdown() {
 	m.lock.Lock()
-	outputs := m.outputs
+	defer m.lock.Unlock()
+	for _, output := range m.outputs {
+		close(output.dst)
+	}
+}
+
+// RunStep handles a single item through the mux
+func (m *PairMux) RunStep() bool {
+	item, ok := <-m.src
+	if !ok {
+		return false
+	}
+	m.lock.Lock()
+	outputs := m.outputs[:]
 	m.lock.Unlock()
 
 	for _, output := range outputs {
 		m.writer(output, item)
 	}
+	return true
 }
 
 // blockingOutputWriter writes out to a channel

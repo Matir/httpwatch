@@ -46,6 +46,7 @@ func (r *RuleEngine) AddRule(rule Rule) {
 }
 
 // Start starts each of the rules in a goroutine
+// TODO: make it stop everything if input ceases
 func (r *RuleEngine) Start() {
 	r.lock.Lock()
 	defer r.lock.Unlock()

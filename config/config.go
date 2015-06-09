@@ -24,6 +24,12 @@ type Config struct {
 	Rules      []rules.Rule
 	Interfaces []string
 	PcapFiles  []string
+	Outputs    []outputConfig
+}
+
+type outputConfig struct {
+	name    string
+	options map[string]string
 }
 
 func (c *Config) ParseConfigFile(name string) {
@@ -54,6 +60,10 @@ func (c *Config) Init() {
 	if len(pcapfiles) > 0 {
 		c.PcapFiles = pcapfiles
 	}
+}
+
+func (c *Config) Valid() bool {
+	return false
 }
 
 func (rs *RepeatedStringFlag) String() string {
