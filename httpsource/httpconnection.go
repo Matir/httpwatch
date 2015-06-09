@@ -7,10 +7,13 @@ package httpsource
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"github.com/google/gopacket/tcpassembly/tcpreader"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 // RequestResponsePair is a container for an associated
@@ -21,6 +24,7 @@ type RequestResponsePair struct {
 	RequestBody  []byte
 	Response     *http.Response
 	ResponseBody []byte
+	fingerprint  *string
 }
 
 // HTTPConnection represents the HTTP transactions within a single
@@ -178,6 +182,34 @@ func consumeWhitespace(r *bufio.Reader) error {
 			return nil
 		}
 	}
+}
+
+// Fingerprint computes a fingerprint over the request and response data.
+// Potentially very slow for large requests or responses.
+func (p *RequestResponsePair) Fingerprint() string {
+	if p.fingerprint != nil {
+		return *p.fingerprint
+	}
+
+	h := sha256.New()
+	if p.Request != nil {
+		h.Write([]byte(p.Request.Method))
+		h.Write([]byte(p.Request.URL.String()))
+		for hdr, vals := range p.Request.Header {
+			h.Write([]byte(hdr + strings.Join(vals, "|")))
+		}
+		h.Write(p.RequestBody)
+	}
+	if p.Response != nil {
+		h.Write([]byte(p.Response.Status))
+		for hdr, vals := range p.Response.Header {
+			h.Write([]byte(hdr + strings.Join(vals, "|")))
+		}
+		h.Write(p.ResponseBody)
+	}
+	s := hex.EncodeToString(h.Sum(nil))
+	p.fingerprint = &s
+	return *p.fingerprint
 }
 
 func (b *bodyBuffer) Close() error { return nil }
