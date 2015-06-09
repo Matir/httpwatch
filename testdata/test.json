@@ -1,0 +1,16 @@
+{
+  "outputs": [
+    {"name": "request"}
+  ],
+  "rules": [
+    {
+    "name": "testing",
+    "operator": "==",
+    "field": "request.method",
+    "value": "GET"
+    }
+  ],
+  "pcapfiles": [
+    "httpsource/testdata/e2e.pcap"
+  ]
+}
