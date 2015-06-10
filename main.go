@@ -18,6 +18,11 @@ func main() {
 		return
 	}
 
+	// Set all loggers to the same
+	httpsource.SetLogger(cfg.Logger)
+	output.SetLogger(cfg.Logger)
+	rules.SetLogger(cfg.Logger)
+
 	// Setup sources
 	source := httpsource.NewHTTPSource()
 	source.ConvertConnectionsToPairs()

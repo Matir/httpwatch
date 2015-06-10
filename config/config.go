@@ -6,6 +6,7 @@ import (
 	"flag"
 	"github.com/Matir/httpwatch/rules"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -16,16 +17,19 @@ type RepeatedStringFlag []string
 
 // Flag definitons
 var configFilename = flag.String("config", "~/.httpwatch", "Configuration file location.")
+var logfileName = flag.String("logfile", "", "Logfile for output.")
 var interfaces RepeatedStringFlag
 var pcapfiles RepeatedStringFlag
 
 // Config represents the whole config
 type Config struct {
 	Filename   string
+	Logfile    string
 	Rules      []rules.Rule
 	Interfaces []string
 	PcapFiles  []string
 	Outputs    []outputConfig
+	Logger     *log.Logger
 }
 
 type outputConfig struct {
@@ -48,6 +52,7 @@ func (c *Config) ParseConfigFile(name string) {
 	if err != nil {
 		panic(err)
 	}
+	c.Filename = name
 }
 
 func (c *Config) Init() {
@@ -60,6 +65,19 @@ func (c *Config) Init() {
 	}
 	if len(pcapfiles) > 0 {
 		c.PcapFiles = pcapfiles
+	}
+
+	// Setup logfile from config
+	if *logfileName != "" {
+		c.Logfile = *logfileName
+	} else if c.Logfile == "" {
+		c.Logfile = "/dev/stderr"
+	}
+	if fp, err := os.Create(c.Logfile); err == nil {
+		c.Logger = log.New(fp, "httpwatch: ", log.Lshortfile|log.Ltime)
+	} else {
+		c.Logger = log.New(os.Stderr, "httpwatch: ", log.Lshortfile|log.Ltime)
+		c.Logger.Printf("Unable to open %s: %s.  Using stderr instead.\n", c.Logfile, err)
 	}
 }
 

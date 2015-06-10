@@ -27,3 +27,8 @@ func (r *Rule) Eval(pair *httpsource.RequestResponsePair) bool {
 	}
 	return r.evaluator.Eval(pair)
 }
+
+// SetLogger sets the logger for this package
+func SetLogger(l *log.Logger) {
+	logger = l
+}

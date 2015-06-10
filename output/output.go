@@ -82,3 +82,8 @@ func (e *OutputEngine) Start() {
 func (e *OutputEngine) WaitUntilFinished() {
 	<-e.allDone
 }
+
+// SetLogger sets the logger for this package
+func SetLogger(l *log.Logger) {
+	logger = l
+}

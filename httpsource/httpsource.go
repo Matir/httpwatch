@@ -201,3 +201,8 @@ func (key connKey) swap() connKey {
 	net, tcp := key[0], key[1]
 	return connKey{net.Reverse(), tcp.Reverse()}
 }
+
+// SetLogger sets the logger for this package
+func SetLogger(l *log.Logger) {
+	logger = l
+}
