@@ -114,6 +114,7 @@ func (src *HTTPSource) AddPCAPFile(fname string) error {
 	if handle, err = pcap.OpenOffline(fname); err != nil {
 		return err
 	}
+	logger.Printf("Opened pcap: %s\n", fname)
 	return src.addPCAPSource(handle)
 }
 
@@ -124,8 +125,10 @@ func (src *HTTPSource) AddPCAPIface(iface string) error {
 	var handle *pcap.Handle
 	var err error
 	if handle, err = pcap.OpenLive(iface, 0xffff, false, 100*time.Millisecond); err != nil {
+		logger.Printf("Error adding interface %s: %s\n", iface, err)
 		return err
 	}
+	logger.Printf("Opened interface: %s\n", iface)
 	return src.addPCAPSource(handle)
 }
 

@@ -1,0 +1,14 @@
+{
+  "outputs": [
+    {"name": "request"}
+  ],
+  "rules": [
+    {
+    "name": "testing",
+    "operator": "==",
+    "field": "request.method",
+    "value": "POST"
+    }
+  ],
+  "interfaces": ["wlan0"]
+}

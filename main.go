@@ -26,11 +26,23 @@ func main() {
 	// Setup sources
 	source := httpsource.NewHTTPSource()
 	source.ConvertConnectionsToPairs()
+	opened_any := false
 	for _, iface := range cfg.Interfaces {
-		source.AddPCAPIface(iface)
+		if err := source.AddPCAPIface(iface); err != nil {
+			cfg.Logger.Printf("Error adding interface: %s\n", err)
+		} else {
+			opened_any = true
+		}
 	}
 	for _, fname := range cfg.PcapFiles {
-		source.AddPCAPFile(fname)
+		if err := source.AddPCAPFile(fname); err != nil {
+			cfg.Logger.Printf("Error opening file: %s\n", err)
+		} else {
+			opened_any = true
+		}
+	}
+	if !opened_any {
+		return
 	}
 
 	// Create rule mux
